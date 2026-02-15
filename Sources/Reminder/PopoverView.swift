@@ -3,10 +3,10 @@ import SwiftUI
 struct PopoverView: View {
     @EnvironmentObject var manager: ReminderManager
 
-    @State private var note: String = ""
-    @State private var timeInput: String = ""
-    @State private var parsedDate: Date?
+    @State private var input: String = ""
+    @State private var parsed: ParsedReminder?
     @State private var showError: Bool = false
+    @FocusState private var isInputFocused: Bool
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -20,38 +20,32 @@ struct PopoverView: View {
             Text("New Reminder")
                 .font(.headline)
 
-            TextField("What do you want to be reminded about?", text: $note, axis: .vertical)
+            TextField("e.g. \"Buy groceries tomorrow at 9am\"", text: $input)
                 .textFieldStyle(.roundedBorder)
-                .lineLimit(3...5)
-
-            TextField("When? e.g. \"in 2h\", \"tomorrow at 9am\"", text: $timeInput)
-                .textFieldStyle(.roundedBorder)
+                .focused($isInputFocused)
                 .onSubmit { submit() }
-                .onChange(of: timeInput) { newValue in
-                    parsedDate = DateParser.parse(newValue)
+                .onChange(of: input) { newValue in
+                    parsed = DateParser.parse(newValue)
                     showError = false
                 }
 
-            if let date = parsedDate {
-                Text("Will remind: \(dateFormatter.string(from: date))")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            if let parsed = parsed {
+                HStack(spacing: 4) {
+                    if !parsed.note.isEmpty {
+                        Text("\"\(parsed.note)\"")
+                            .fontWeight(.medium)
+                        Text("—")
+                    }
+                    Text(dateFormatter.string(from: parsed.date))
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
 
             if showError {
-                Text("Could not parse the time. Try \"in 2h\" or \"tomorrow at 9am\".")
+                Text("Could not parse. Try \"Buy milk tomorrow at 9am\" or \"Call mom in 2h\".")
                     .font(.caption)
                     .foregroundColor(.red)
-            }
-
-            HStack {
-                Spacer()
-                Button("Remind Me") {
-                    submit()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(note.trimmingCharacters(in: .whitespaces).isEmpty || timeInput.trimmingCharacters(in: .whitespaces).isEmpty)
-                .keyboardShortcut(.return, modifiers: .command)
             }
 
             if !manager.pendingReminders.isEmpty {
@@ -119,19 +113,20 @@ struct PopoverView: View {
         }
         .padding()
         .frame(width: 320)
+        .onAppear {
+            isInputFocused = true
+        }
     }
 
     private func submit() {
-        guard let date = DateParser.parse(timeInput) else {
+        guard let result = DateParser.parse(input) else {
             showError = true
             return
         }
-        let trimmedNote = note.trimmingCharacters(in: .whitespaces)
-        guard !trimmedNote.isEmpty else { return }
 
-        manager.scheduleReminder(note: trimmedNote, at: date)
-        note = ""
-        timeInput = ""
-        parsedDate = nil
+        let note = result.note.isEmpty ? input : result.note
+        manager.scheduleReminder(note: note, at: result.date)
+        input = ""
+        parsed = nil
     }
 }

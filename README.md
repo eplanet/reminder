@@ -5,8 +5,8 @@ A lightweight macOS menu bar app for quickly creating reminders with natural lan
 ## Features
 
 - **Menu bar app** — lives in your system tray as a bell icon, no dock clutter
-- **Natural language time input** — type times like `in 2h`, `tomorrow at 9am`, `next Monday at 10am`, `in 30m`
-- **Live date preview** — see the resolved date as you type
+- **Single input, Slack-style** — type everything in one field, e.g. `Buy groceries tomorrow at 9am`
+- **Live preview** — see the extracted note and resolved date as you type
 - **Popup alert** — a floating window pops up in front of all other windows when a reminder fires
 - **Customizable sound** — pick from 14 macOS system sounds (Glass, Ping, Pop, Sosumi, etc.) with a preview button
 - **Persistent reminders** — saved as JSON in `~/.local/reminder/reminders.json`, survives restarts
@@ -34,23 +34,20 @@ make clean
 
 ## Usage
 
-1. Click the bell icon in the menu bar
-2. Type your reminder note in the first field
-3. Type when you want to be reminded in the second field (e.g. `in 10m`, `tomorrow at 9am`)
-4. Press **Enter** or click **Remind Me**
-5. When the time comes, a floating alert window appears with a sound
+1. Click the bell icon in the menu bar — the input is auto-focused
+2. Type your reminder in a single field: **what** + **when** (like Slack's `/remind`)
+3. Press **Enter**
+4. When the time comes, a floating alert window appears with a sound
 
-## Time Input Examples
+## Examples
 
-| Input | Meaning |
-|---|---|
-| `in 5m` | 5 minutes from now |
-| `in 2h` | 2 hours from now |
-| `in 1d` | 1 day from now |
-| `in 1w` | 1 week from now |
-| `tomorrow at 9am` | Tomorrow at 9:00 AM |
-| `next Monday at 10am` | Next Monday at 10:00 AM |
-| `Friday at 3pm` | This Friday at 3:00 PM |
+| Input | Note | When |
+|---|---|---|
+| `Buy groceries tomorrow at 9am` | Buy groceries | Tomorrow 9:00 AM |
+| `Call mom in 2h` | Call mom | 2 hours from now |
+| `Team standup next Monday at 10am` | Team standup | Next Monday 10:00 AM |
+| `Take a break in 30m` | Take a break | 30 minutes from now |
+| `Submit report Friday at 3pm` | Submit report | This Friday 3:00 PM |
 
 ## License
 
