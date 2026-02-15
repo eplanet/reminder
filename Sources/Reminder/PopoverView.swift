@@ -48,38 +48,76 @@ struct PopoverView: View {
                     .foregroundColor(.red)
             }
 
-            if !manager.pendingReminders.isEmpty {
+            if !manager.pendingReminders.isEmpty || !manager.firedReminders.isEmpty {
                 Divider()
-
-                Text("Upcoming")
-                    .font(.headline)
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(manager.pendingReminders) { item in
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.note)
-                                        .font(.body)
-                                        .lineLimit(2)
-                                    Text(dateFormatter.string(from: item.fireDate))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                        if !manager.pendingReminders.isEmpty {
+                            Text("Upcoming")
+                                .font(.headline)
+
+                            ForEach(manager.pendingReminders) { item in
+                                HStack(alignment: .top) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(item.note)
+                                            .font(.body)
+                                            .lineLimit(2)
+                                        Text(dateFormatter.string(from: item.fireDate))
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        manager.removeReminder(item)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                    }
+                                    .buttonStyle(.borderless)
                                 }
-                                Spacer()
-                                Button(role: .destructive) {
-                                    manager.removeReminder(item)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundColor(.red)
-                                }
-                                .buttonStyle(.borderless)
+                                .padding(.vertical, 2)
                             }
-                            .padding(.vertical, 2)
+                        }
+
+                        if !manager.firedReminders.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Past")
+                                    .font(.headline)
+
+                                ForEach(manager.firedReminders) { item in
+                                    HStack(alignment: .top) {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.note)
+                                                .font(.body)
+                                                .italic()
+                                                .lineLimit(2)
+                                                .foregroundColor(.secondary)
+                                            Text(dateFormatter.string(from: item.fireDate))
+                                                .font(.caption)
+                                                .italic()
+                                                .foregroundColor(.secondary)
+                                        }
+                                        Spacer()
+                                        Button(role: .destructive) {
+                                            manager.removeReminder(item)
+                                        } label: {
+                                            Image(systemName: "trash")
+                                                .foregroundColor(.red)
+                                        }
+                                        .buttonStyle(.borderless)
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                            }
+                            .padding(8)
+                            .background(Color.gray.opacity(0.15))
+                            .cornerRadius(8)
+                            .padding(.top, manager.pendingReminders.isEmpty ? 0 : 4)
                         }
                     }
                 }
-                .frame(maxHeight: 200)
+                .frame(maxHeight: 250)
             }
 
             Divider()

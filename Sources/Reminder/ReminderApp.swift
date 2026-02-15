@@ -9,9 +9,6 @@ struct ReminderApp: App {
         MenuBarExtra("Reminder", systemImage: "bell.badge") {
             PopoverView()
                 .environmentObject(manager)
-                .onAppear {
-                    appDelegate.manager = manager
-                }
         }
         .menuBarExtraStyle(.window)
     }

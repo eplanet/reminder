@@ -20,11 +20,11 @@ enum ReminderSound: String, CaseIterable, Codable {
     func play() {
         NSSound(named: NSSound.Name(rawValue))?.play()
     }
+
 }
 
 @MainActor
 class ReminderManager: ObservableObject {
-    @Published var firedReminder: ReminderItem?
     @Published var selectedSound: ReminderSound {
         didSet { UserDefaults.standard.set(selectedSound.rawValue, forKey: soundKey) }
     }
@@ -32,8 +32,8 @@ class ReminderManager: ObservableObject {
     /// All reminders (pending + fired), persisted to disk.
     private var allReminders: [ReminderItem] = []
 
-    /// Only pending (unfired) reminders, shown in the UI.
     @Published var pendingReminders: [ReminderItem] = []
+    @Published var firedReminders: [ReminderItem] = []
 
     private let soundKey = "reminder_sound"
     private var dispatchers: [UUID: DispatchSourceTimer] = [:]
@@ -52,10 +52,7 @@ class ReminderManager: ObservableObject {
         self.selectedSound = savedSound.flatMap { ReminderSound(rawValue: $0) } ?? .glass
         loadReminders()
         markExpiredAsFired()
-        refreshPending()
-    }
-
-    func start() {
+        refreshLists()
         rescheduleAll()
     }
 
@@ -70,7 +67,7 @@ class ReminderManager: ObservableObject {
         allReminders.append(item)
         allReminders.sort { $0.fireDate < $1.fireDate }
         save()
-        refreshPending()
+        refreshLists()
     }
 
     func removeReminder(_ item: ReminderItem) {
@@ -78,15 +75,25 @@ class ReminderManager: ObservableObject {
         dispatchers.removeValue(forKey: item.id)
         allReminders.removeAll { $0.id == item.id }
         save()
-        refreshPending()
-    }
-
-    func dismissFiredReminder() {
-        firedReminder = nil
+        refreshLists()
     }
 
     func previewSound() {
         selectedSound.play()
+    }
+
+    // MARK: - Notifications
+
+    private func sendNotification(for item: ReminderItem) {
+        // Use osascript for reliable native notification without code signing / permissions
+        let escapedBody = item.note.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        let script = "display notification \"\(escapedBody)\" with title \"Reminder\" sound name \"\(selectedSound.rawValue)\""
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+        try? process.run()
     }
 
     // MARK: - Dispatch-based scheduling
@@ -115,21 +122,10 @@ class ReminderManager: ObservableObject {
             allReminders[index].fired = true
         }
         save()
-        refreshPending()
+        refreshLists()
 
-        // Play the selected sound
-        selectedSound.play()
-
-        // Set the fired reminder so the alert window appears
-        firedReminder = item
-
-        // Also send an osascript notification as a banner
-        let escapedBody = item.note.replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "display notification \"\(escapedBody)\" with title \"Reminder\" sound name \"\(selectedSound.rawValue)\""
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        process.arguments = ["-e", script]
-        try? process.run()
+        // Send native notification
+        sendNotification(for: item)
     }
 
     private func rescheduleAll() {
@@ -149,8 +145,9 @@ class ReminderManager: ObservableObject {
         if changed { save() }
     }
 
-    private func refreshPending() {
+    private func refreshLists() {
         pendingReminders = allReminders.filter { !$0.fired }.sorted { $0.fireDate < $1.fireDate }
+        firedReminders = allReminders.filter { $0.fired }.sorted { $0.fireDate > $1.fireDate }
     }
 
     // MARK: - Persistence
