@@ -1,32 +1,28 @@
 import AppKit
+import AVFoundation
 import Foundation
 
-enum ReminderSound: String, CaseIterable, Codable {
-    case basso = "Basso"
-    case blow = "Blow"
-    case bottle = "Bottle"
-    case frog = "Frog"
-    case funk = "Funk"
-    case glass = "Glass"
-    case hero = "Hero"
-    case morse = "Morse"
-    case ping = "Ping"
-    case pop = "Pop"
-    case purr = "Purr"
-    case sosumi = "Sosumi"
-    case submarine = "Submarine"
-    case tink = "Tink"
+let systemSounds = [
+    "Basso", "Blow", "Bottle", "Frog", "Funk", "Glass", "Hero",
+    "Morse", "Ping", "Pop", "Purr", "Sosumi", "Submarine", "Tink"
+]
 
-    func play() {
-        NSSound(named: NSSound.Name(rawValue))?.play()
-    }
-
-}
+private let customSoundMarker = "__custom__"
 
 @MainActor
 class ReminderManager: ObservableObject {
-    @Published var selectedSound: ReminderSound {
-        didSet { UserDefaults.standard.set(selectedSound.rawValue, forKey: soundKey) }
+    /// Display name shown in the picker. System sound name or "Custom".
+    @Published var selectedSoundName: String {
+        didSet {
+            UserDefaults.standard.set(selectedSoundName, forKey: soundKey)
+        }
+    }
+
+    /// Path to the custom MP3 file, if any.
+    @Published var customSoundPath: String? {
+        didSet {
+            UserDefaults.standard.set(customSoundPath, forKey: customSoundKey)
+        }
     }
 
     /// All reminders (pending + fired), persisted to disk.
@@ -36,7 +32,16 @@ class ReminderManager: ObservableObject {
     @Published var firedReminders: [ReminderItem] = []
 
     private let soundKey = "reminder_sound"
+    private let customSoundKey = "reminder_custom_sound_path"
     private var dispatchers: [UUID: DispatchSourceTimer] = [:]
+    private var audioPlayer: AVAudioPlayer?
+
+    var isCustomSound: Bool { selectedSoundName == customSoundMarker }
+
+    var customSoundDisplayName: String? {
+        guard let path = customSoundPath else { return nil }
+        return URL(fileURLWithPath: path).lastPathComponent
+    }
 
     private static var storageDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -48,12 +53,30 @@ class ReminderManager: ObservableObject {
     }
 
     init() {
-        let savedSound = UserDefaults.standard.string(forKey: soundKey)
-        self.selectedSound = savedSound.flatMap { ReminderSound(rawValue: $0) } ?? .glass
+        let saved = UserDefaults.standard.string(forKey: soundKey) ?? "Glass"
+        self.selectedSoundName = saved
+        self.customSoundPath = UserDefaults.standard.string(forKey: customSoundKey)
         loadReminders()
         markExpiredAsFired()
         refreshLists()
         rescheduleAll()
+    }
+
+    func selectSystemSound(_ name: String) {
+        selectedSoundName = name
+    }
+
+    func selectCustomSound() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.mp3, .audio]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a custom sound file"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            customSoundPath = url.path
+            selectedSoundName = customSoundMarker
+        }
     }
 
     func scheduleReminder(note: String, at fireDate: Date) {
@@ -79,16 +102,36 @@ class ReminderManager: ObservableObject {
     }
 
     func previewSound() {
-        selectedSound.play()
+        playSound()
+    }
+
+    // MARK: - Sound playback
+
+    private func playSound() {
+        if isCustomSound, let path = customSoundPath {
+            let url = URL(fileURLWithPath: path)
+            audioPlayer = try? AVAudioPlayer(contentsOf: url)
+            audioPlayer?.play()
+        } else {
+            NSSound(named: NSSound.Name(selectedSoundName))?.play()
+        }
     }
 
     // MARK: - Notifications
 
     private func sendNotification(for item: ReminderItem) {
-        // Use osascript for reliable native notification without code signing / permissions
         let escapedBody = item.note.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "display notification \"\(escapedBody)\" with title \"Reminder\" sound name \"\(selectedSound.rawValue)\""
+
+        // osascript sound name only works with system sounds; for custom we play separately
+        let soundClause: String
+        if isCustomSound {
+            soundClause = ""
+        } else {
+            soundClause = " sound name \"\(selectedSoundName)\""
+        }
+
+        let script = "display notification \"\(escapedBody)\" with title \"Reminder\"\(soundClause)"
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -117,14 +160,13 @@ class ReminderManager: ObservableObject {
         dispatchers[item.id]?.cancel()
         dispatchers.removeValue(forKey: item.id)
 
-        // Mark as fired instead of removing
         if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
             allReminders[index].fired = true
         }
         save()
         refreshLists()
 
-        // Send native notification
+        playSound()
         sendNotification(for: item)
     }
 
@@ -134,7 +176,6 @@ class ReminderManager: ObservableObject {
         }
     }
 
-    /// Mark reminders whose fireDate has passed (e.g. while app was closed) as fired.
     private func markExpiredAsFired() {
         let now = Date()
         var changed = false

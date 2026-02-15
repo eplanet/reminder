@@ -90,12 +90,19 @@ struct PopoverView: View {
             HStack {
                 Text("Sound")
                     .font(.subheadline)
-                Picker("", selection: $manager.selectedSound) {
-                    ForEach(ReminderSound.allCases, id: \.self) { sound in
-                        Text(sound.rawValue).tag(sound)
+
+                Menu {
+                    ForEach(systemSounds, id: \.self) { name in
+                        Button(name) { manager.selectSystemSound(name) }
                     }
+                    Divider()
+                    Button("Custom file\u{2026}") { manager.selectCustomSound() }
+                } label: {
+                    Text(manager.isCustomSound
+                         ? (manager.customSoundDisplayName ?? "Custom")
+                         : manager.selectedSoundName)
+                        .frame(width: 100, alignment: .leading)
                 }
-                .labelsHidden()
                 .frame(width: 120)
 
                 Button {
