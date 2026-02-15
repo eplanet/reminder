@@ -58,25 +58,9 @@ struct PopoverView: View {
                                 .font(.headline)
 
                             ForEach(manager.pendingReminders) { item in
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.note)
-                                            .font(.body)
-                                            .lineLimit(2)
-                                        Text(dateFormatter.string(from: item.fireDate))
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    Button(role: .destructive) {
-                                        manager.removeReminder(item)
-                                    } label: {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
-                                    }
-                                    .buttonStyle(.borderless)
+                                ReminderRow(item: item, isFired: false, dateFormatter: dateFormatter) {
+                                    manager.removeReminder(item)
                                 }
-                                .padding(.vertical, 2)
                             }
                         }
 
@@ -86,28 +70,9 @@ struct PopoverView: View {
                                     .font(.headline)
 
                                 ForEach(manager.firedReminders) { item in
-                                    HStack(alignment: .top) {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(item.note)
-                                                .font(.body)
-                                                .italic()
-                                                .lineLimit(2)
-                                                .foregroundColor(.secondary)
-                                            Text(dateFormatter.string(from: item.fireDate))
-                                                .font(.caption)
-                                                .italic()
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Button(role: .destructive) {
-                                            manager.removeReminder(item)
-                                        } label: {
-                                            Image(systemName: "trash")
-                                                .foregroundColor(.red)
-                                        }
-                                        .buttonStyle(.borderless)
+                                    ReminderRow(item: item, isFired: true, dateFormatter: dateFormatter) {
+                                        manager.removeReminder(item)
                                     }
-                                    .padding(.vertical, 2)
                                 }
                             }
                             .padding(8)
@@ -166,5 +131,85 @@ struct PopoverView: View {
         manager.scheduleReminder(note: note, at: result.date)
         input = ""
         parsed = nil
+    }
+}
+
+// MARK: - Reminder Row
+
+private struct ReminderRow: View {
+    let item: ReminderItem
+    let isFired: Bool
+    let dateFormatter: DateFormatter
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+                LinkedText(text: item.note)
+                    .font(.body)
+                    .italic(isFired)
+                    .foregroundColor(isFired ? .secondary : .primary)
+                    .lineLimit(2)
+                Text(dateFormatter.string(from: item.fireDate))
+                    .font(.caption)
+                    .italic(isFired)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(item.note, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help("Copy text")
+
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+            }
+            .buttonStyle(.borderless)
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+// MARK: - Linked Text
+
+/// Renders text with URLs as clickable links.
+private struct LinkedText: View {
+    let text: String
+
+    var body: some View {
+        if let attributed = makeAttributedString() {
+            Text(attributed)
+        } else {
+            Text(text)
+        }
+    }
+
+    private func makeAttributedString() -> AttributedString? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return nil
+        }
+        let nsRange = NSRange(text.startIndex..., in: text)
+        let matches = detector.matches(in: text, range: nsRange)
+        guard !matches.isEmpty else { return nil }
+
+        var attributed = AttributedString(text)
+
+        for match in matches {
+            guard let range = Range(match.range, in: text),
+                  let attrRange = Range(range, in: attributed),
+                  let url = match.url else { continue }
+            attributed[attrRange].link = url
+            attributed[attrRange].underlineStyle = .single
+        }
+
+        return attributed
     }
 }

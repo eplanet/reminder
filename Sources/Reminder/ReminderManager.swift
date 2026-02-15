@@ -156,7 +156,7 @@ class ReminderManager: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: Self.storageDir, withIntermediateDirectories: true)
             let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             encoder.dateEncodingStrategy = .iso8601
             let data = try encoder.encode(allReminders)
             try data.write(to: Self.storageFile, options: .atomic)
