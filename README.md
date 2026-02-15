@@ -7,7 +7,7 @@ A lightweight macOS menu bar app for quickly creating reminders with natural lan
 - **Menu bar app** — lives in your system tray as a bell icon, no dock clutter
 - **Single input, Slack-style** — type everything in one field, e.g. `Buy groceries tomorrow at 9am`
 - **Live preview** — see the extracted note and resolved date as you type
-- **Popup alert** — a floating window pops up in front of all other windows when a reminder fires
+- **Native notifications** — macOS notification banner with sound when a reminder fires
 - **Customizable sound** — pick from 14 macOS system sounds (Glass, Ping, Pop, Sosumi, etc.) with a preview button
 - **Persistent reminders** — saved as JSON in `~/.local/reminder/reminders.json`, survives restarts
 - **Manage reminders** — view upcoming reminders and delete them from the popover
@@ -32,12 +32,28 @@ make clean
 
 > **Note:** Do not use `swift run` directly — the app requires a proper `.app` bundle for macOS system integrations.
 
+## Install
+
+```bash
+make install
+```
+
+This will:
+- Build the app and copy `Reminder.app` to `~/Applications/`
+- Create a LaunchAgent so the app starts automatically at login
+
+To uninstall and remove the LaunchAgent:
+
+```bash
+make uninstall
+```
+
 ## Usage
 
 1. Click the bell icon in the menu bar — the input is auto-focused
 2. Type your reminder in a single field: **what** + **when** (like Slack's `/remind`)
 3. Press **Enter**
-4. When the time comes, a floating alert window appears with a sound
+4. When the time comes, a native macOS notification appears with a sound
 
 ## Examples
 
