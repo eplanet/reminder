@@ -24,11 +24,16 @@ enum ReminderSound: String, CaseIterable, Codable {
 
 @MainActor
 class ReminderManager: ObservableObject {
-    @Published var reminders: [ReminderItem] = []
     @Published var firedReminder: ReminderItem?
     @Published var selectedSound: ReminderSound {
         didSet { UserDefaults.standard.set(selectedSound.rawValue, forKey: soundKey) }
     }
+
+    /// All reminders (pending + fired), persisted to disk.
+    private var allReminders: [ReminderItem] = []
+
+    /// Only pending (unfired) reminders, shown in the UI.
+    @Published var pendingReminders: [ReminderItem] = []
 
     private let soundKey = "reminder_sound"
     private var dispatchers: [UUID: DispatchSourceTimer] = [:]
@@ -46,7 +51,8 @@ class ReminderManager: ObservableObject {
         let savedSound = UserDefaults.standard.string(forKey: soundKey)
         self.selectedSound = savedSound.flatMap { ReminderSound(rawValue: $0) } ?? .glass
         loadReminders()
-        pruneExpiredReminders()
+        markExpiredAsFired()
+        refreshPending()
     }
 
     func start() {
@@ -61,16 +67,18 @@ class ReminderManager: ObservableObject {
 
         scheduleDispatch(for: item)
 
-        reminders.append(item)
-        reminders.sort { $0.fireDate < $1.fireDate }
-        saveReminders()
+        allReminders.append(item)
+        allReminders.sort { $0.fireDate < $1.fireDate }
+        save()
+        refreshPending()
     }
 
     func removeReminder(_ item: ReminderItem) {
         dispatchers[item.id]?.cancel()
         dispatchers.removeValue(forKey: item.id)
-        reminders.removeAll { $0.id == item.id }
-        saveReminders()
+        allReminders.removeAll { $0.id == item.id }
+        save()
+        refreshPending()
     }
 
     func dismissFiredReminder() {
@@ -101,8 +109,13 @@ class ReminderManager: ObservableObject {
     private func fireReminder(_ item: ReminderItem) {
         dispatchers[item.id]?.cancel()
         dispatchers.removeValue(forKey: item.id)
-        reminders.removeAll { $0.id == item.id }
-        saveReminders()
+
+        // Mark as fired instead of removing
+        if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
+            allReminders[index].fired = true
+        }
+        save()
+        refreshPending()
 
         // Play the selected sound
         selectedSound.play()
@@ -120,20 +133,35 @@ class ReminderManager: ObservableObject {
     }
 
     private func rescheduleAll() {
-        for item in reminders {
+        for item in allReminders where !item.fired {
             scheduleDispatch(for: item)
         }
     }
 
+    /// Mark reminders whose fireDate has passed (e.g. while app was closed) as fired.
+    private func markExpiredAsFired() {
+        let now = Date()
+        var changed = false
+        for i in allReminders.indices where !allReminders[i].fired && allReminders[i].fireDate < now {
+            allReminders[i].fired = true
+            changed = true
+        }
+        if changed { save() }
+    }
+
+    private func refreshPending() {
+        pendingReminders = allReminders.filter { !$0.fired }.sorted { $0.fireDate < $1.fireDate }
+    }
+
     // MARK: - Persistence
 
-    private func saveReminders() {
+    private func save() {
         do {
             try FileManager.default.createDirectory(at: Self.storageDir, withIntermediateDirectories: true)
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             encoder.dateEncodingStrategy = .iso8601
-            let data = try encoder.encode(reminders)
+            let data = try encoder.encode(allReminders)
             try data.write(to: Self.storageFile, options: .atomic)
         } catch {
             print("Failed to save reminders: \(error)")
@@ -145,12 +173,6 @@ class ReminderManager: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let items = try? decoder.decode([ReminderItem].self, from: data) else { return }
-        reminders = items.sorted { $0.fireDate < $1.fireDate }
-    }
-
-    private func pruneExpiredReminders() {
-        let now = Date()
-        reminders.removeAll { $0.fireDate < now }
-        saveReminders()
+        allReminders = items.sorted { $0.fireDate < $1.fireDate }
     }
 }

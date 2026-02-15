@@ -54,7 +54,7 @@ struct PopoverView: View {
                 .keyboardShortcut(.return, modifiers: .command)
             }
 
-            if !manager.reminders.isEmpty {
+            if !manager.pendingReminders.isEmpty {
                 Divider()
 
                 Text("Upcoming")
@@ -62,7 +62,7 @@ struct PopoverView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(manager.reminders) { item in
+                        ForEach(manager.pendingReminders) { item in
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.note)
