@@ -8,6 +8,7 @@ let systemSounds = [
 ]
 
 private let customSoundMarker = "__custom__"
+private let silentMarker = "__silent__"
 
 @MainActor
 class ReminderManager: ObservableObject {
@@ -31,12 +32,26 @@ class ReminderManager: ObservableObject {
     @Published var pendingReminders: [ReminderItem] = []
     @Published var firedReminders: [ReminderItem] = []
 
+    @Published var archiveOnDelete: Bool {
+        didSet {
+            UserDefaults.standard.set(archiveOnDelete, forKey: archiveKey)
+        }
+    }
+
     private let soundKey = "reminder_sound"
     private let customSoundKey = "reminder_custom_sound_path"
+    private let archiveKey = "reminder_archive_on_delete"
     private var dispatchers: [UUID: DispatchSourceTimer] = [:]
     private var audioPlayer: AVAudioPlayer?
 
+    var isSilent: Bool { selectedSoundName == silentMarker }
     var isCustomSound: Bool { selectedSoundName == customSoundMarker }
+
+    var soundDisplayName: String {
+        if isSilent { return "Silent" }
+        if isCustomSound { return customSoundPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Custom" }
+        return selectedSoundName
+    }
 
     var customSoundDisplayName: String? {
         guard let path = customSoundPath else { return nil }
@@ -52,10 +67,15 @@ class ReminderManager: ObservableObject {
         storageDir.appendingPathComponent("reminders.json")
     }
 
+    func selectSilent() {
+        selectedSoundName = silentMarker
+    }
+
     init() {
         let saved = UserDefaults.standard.string(forKey: soundKey) ?? "Glass"
         self.selectedSoundName = saved
         self.customSoundPath = UserDefaults.standard.string(forKey: customSoundKey)
+        self.archiveOnDelete = UserDefaults.standard.object(forKey: archiveKey) as? Bool ?? true
         loadReminders()
         markExpiredAsFired()
         refreshLists()
@@ -113,8 +133,12 @@ class ReminderManager: ObservableObject {
     func removeReminder(_ item: ReminderItem) {
         dispatchers[item.id]?.cancel()
         dispatchers.removeValue(forKey: item.id)
-        if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
-            allReminders[index].archived = true
+        if archiveOnDelete {
+            if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
+                allReminders[index].archived = true
+            }
+        } else {
+            allReminders.removeAll { $0.id == item.id }
         }
         save()
         refreshLists()
@@ -127,6 +151,7 @@ class ReminderManager: ObservableObject {
     // MARK: - Sound playback
 
     private func playSound() {
+        if isSilent { return }
         if isCustomSound, let path = customSoundPath {
             let url = URL(fileURLWithPath: path)
             audioPlayer = try? AVAudioPlayer(contentsOf: url)
@@ -142,9 +167,9 @@ class ReminderManager: ObservableObject {
         let escapedBody = item.note.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
 
-        // osascript sound name only works with system sounds; for custom we play separately
+        // osascript sound name only works with system sounds; for custom/silent we play separately
         let soundClause: String
-        if isCustomSound {
+        if isCustomSound || isSilent {
             soundClause = ""
         } else {
             soundClause = " sound name \"\(selectedSoundName)\""

@@ -8,9 +8,12 @@ A lightweight macOS menu bar app for quickly creating reminders with natural lan
 - **Single input, Slack-style** — type everything in one field, e.g. `Buy groceries tomorrow at 9am`
 - **Live preview** — see the extracted note and resolved date as you type
 - **Native notifications** — macOS notification banner with sound when a reminder fires
-- **Customizable sound** — pick from 14 macOS system sounds (Glass, Ping, Pop, Sosumi, etc.) with a preview button
+- **Customizable sound** — pick from 14 macOS system sounds, a custom MP3 file, or silent mode
 - **Persistent reminders** — saved as JSON in `~/.local/reminder/reminders.json`, survives restarts
-- **Manage reminders** — view upcoming reminders and delete them from the popover
+- **Manage reminders** — view, edit, copy, and delete upcoming and past reminders
+- **Clickable links** — URLs in reminder text are rendered as clickable links
+- **Settings popup** — configure sound, archive behavior, and more from the gear icon
+- **Archive or delete** — choose whether deleted reminders are archived in JSON or permanently removed
 
 ## Requirements
 

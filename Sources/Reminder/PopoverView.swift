@@ -7,6 +7,7 @@ struct PopoverView: View {
     @State private var parsed: ParsedReminder?
     @State private var showError: Bool = false
     @State private var editingItem: ReminderItem?
+    @State private var showSettings: Bool = false
     @FocusState private var isInputFocused: Bool
 
     private let dateFormatter: DateFormatter = {
@@ -120,30 +121,17 @@ struct PopoverView: View {
             Divider()
 
             HStack {
-                Text("Sound")
-                    .font(.subheadline)
-
-                Menu {
-                    ForEach(systemSounds, id: \.self) { name in
-                        Button(name) { manager.selectSystemSound(name) }
-                    }
-                    Divider()
-                    Button("Custom file\u{2026}") { manager.selectCustomSound() }
-                } label: {
-                    Text(manager.isCustomSound
-                         ? (manager.customSoundDisplayName ?? "Custom")
-                         : manager.selectedSoundName)
-                        .frame(width: 100, alignment: .leading)
-                }
-                .frame(width: 120)
-
                 Button {
-                    manager.previewSound()
+                    showSettings.toggle()
                 } label: {
-                    Image(systemName: "speaker.wave.2")
+                    Image(systemName: "gear")
                 }
                 .buttonStyle(.borderless)
-                .help("Preview sound")
+                .help("Settings")
+                .popover(isPresented: $showSettings) {
+                    SettingsView()
+                        .environmentObject(manager)
+                }
 
                 Spacer()
 
