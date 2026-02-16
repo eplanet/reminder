@@ -113,7 +113,9 @@ class ReminderManager: ObservableObject {
     func removeReminder(_ item: ReminderItem) {
         dispatchers[item.id]?.cancel()
         dispatchers.removeValue(forKey: item.id)
-        allReminders.removeAll { $0.id == item.id }
+        if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
+            allReminders[index].archived = true
+        }
         save()
         refreshLists()
     }
@@ -204,8 +206,8 @@ class ReminderManager: ObservableObject {
     }
 
     private func refreshLists() {
-        pendingReminders = allReminders.filter { !$0.fired }.sorted { $0.fireDate < $1.fireDate }
-        firedReminders = allReminders.filter { $0.fired }.sorted { $0.fireDate > $1.fireDate }
+        pendingReminders = allReminders.filter { !$0.fired && !$0.archived }.sorted { $0.fireDate < $1.fireDate }
+        firedReminders = allReminders.filter { $0.fired && !$0.archived }.sorted { $0.fireDate > $1.fireDate }
     }
 
     // MARK: - Persistence
