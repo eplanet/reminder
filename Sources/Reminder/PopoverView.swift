@@ -6,6 +6,7 @@ struct PopoverView: View {
     @State private var input: String = ""
     @State private var parsed: ParsedReminder?
     @State private var showError: Bool = false
+    @State private var editingItem: ReminderItem?
     @FocusState private var isInputFocused: Bool
 
     private let dateFormatter: DateFormatter = {
@@ -15,16 +16,29 @@ struct PopoverView: View {
         return f
     }()
 
+    private var isEditing: Bool { editingItem != nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("New Reminder")
+            Text(isEditing ? "Edit Reminder" : "New Reminder")
                 .font(.headline)
 
-            TextField("e.g. \"Buy groceries tomorrow at 9am\"", text: $input)
-                .textFieldStyle(.roundedBorder)
+            TextEditor(text: $input)
+                .font(.body)
+                .frame(height: 54)
+                .padding(4)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                )
                 .focused($isInputFocused)
-                .onSubmit { submit() }
                 .onChange(of: input) { newValue in
+                    // Submit on Enter (but allow Shift+Enter for newlines)
+                    if newValue.hasSuffix("\n") {
+                        input = String(newValue.dropLast())
+                        submit()
+                        return
+                    }
                     parsed = DateParser.parse(newValue)
                     showError = false
                 }
@@ -48,6 +62,14 @@ struct PopoverView: View {
                     .foregroundColor(.red)
             }
 
+            if isEditing {
+                HStack {
+                    Spacer()
+                    Button("Cancel") { cancelEdit() }
+                        .keyboardShortcut(.escape, modifiers: [])
+                }
+            }
+
             if !manager.pendingReminders.isEmpty || !manager.firedReminders.isEmpty {
                 Divider()
 
@@ -58,9 +80,14 @@ struct PopoverView: View {
                                 .font(.headline)
 
                             ForEach(manager.pendingReminders) { item in
-                                ReminderRow(item: item, isFired: false, dateFormatter: dateFormatter) {
-                                    manager.removeReminder(item)
-                                }
+                                ReminderRow(
+                                    item: item,
+                                    isFired: false,
+                                    isEditing: editingItem?.id == item.id,
+                                    dateFormatter: dateFormatter,
+                                    onEdit: { startEdit(item) },
+                                    onDelete: { manager.removeReminder(item) }
+                                )
                             }
                         }
 
@@ -70,9 +97,14 @@ struct PopoverView: View {
                                     .font(.headline)
 
                                 ForEach(manager.firedReminders) { item in
-                                    ReminderRow(item: item, isFired: true, dateFormatter: dateFormatter) {
-                                        manager.removeReminder(item)
-                                    }
+                                    ReminderRow(
+                                        item: item,
+                                        isFired: true,
+                                        isEditing: false,
+                                        dateFormatter: dateFormatter,
+                                        onEdit: nil,
+                                        onDelete: { manager.removeReminder(item) }
+                                    )
                                 }
                             }
                             .padding(8)
@@ -135,7 +167,26 @@ struct PopoverView: View {
         }
 
         let note = result.note.isEmpty ? input : result.note
-        manager.scheduleReminder(note: note, at: result.date)
+
+        if let item = editingItem {
+            manager.updateReminder(item, note: note, fireDate: result.date)
+            editingItem = nil
+        } else {
+            manager.scheduleReminder(note: note, at: result.date)
+        }
+
+        input = ""
+        parsed = nil
+    }
+
+    private func startEdit(_ item: ReminderItem) {
+        editingItem = item
+        input = item.note + " " + dateFormatter.string(from: item.fireDate)
+        isInputFocused = true
+    }
+
+    private func cancelEdit() {
+        editingItem = nil
         input = ""
         parsed = nil
     }
@@ -146,7 +197,9 @@ struct PopoverView: View {
 private struct ReminderRow: View {
     let item: ReminderItem
     let isFired: Bool
+    let isEditing: Bool
     let dateFormatter: DateFormatter
+    let onEdit: (() -> Void)?
     let onDelete: () -> Void
 
     var body: some View {
@@ -163,6 +216,18 @@ private struct ReminderRow: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
+
+            if let onEdit = onEdit {
+                Button {
+                    onEdit()
+                } label: {
+                    Image(systemName: "pencil")
+                        .foregroundColor(isEditing ? .accentColor : .secondary)
+                }
+                .buttonStyle(.borderless)
+                .help("Edit reminder")
+            }
+
             Button {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(item.note, forType: .string)
@@ -182,6 +247,8 @@ private struct ReminderRow: View {
             .buttonStyle(.borderless)
         }
         .padding(.vertical, 2)
+        .background(isEditing ? Color.accentColor.opacity(0.1) : Color.clear)
+        .cornerRadius(4)
     }
 }
 

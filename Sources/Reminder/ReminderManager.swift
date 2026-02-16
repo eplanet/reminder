@@ -93,6 +93,23 @@ class ReminderManager: ObservableObject {
         refreshLists()
     }
 
+    func updateReminder(_ item: ReminderItem, note: String, fireDate: Date) {
+        // Cancel old timer
+        dispatchers[item.id]?.cancel()
+        dispatchers.removeValue(forKey: item.id)
+
+        // Update in place
+        if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
+            allReminders[index].note = note
+            allReminders[index].fireDate = fireDate
+            allReminders[index].fired = false
+            scheduleDispatch(for: allReminders[index])
+        }
+        allReminders.sort { $0.fireDate < $1.fireDate }
+        save()
+        refreshLists()
+    }
+
     func removeReminder(_ item: ReminderItem) {
         dispatchers[item.id]?.cancel()
         dispatchers.removeValue(forKey: item.id)
