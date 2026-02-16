@@ -102,9 +102,6 @@ class ReminderManager: ObservableObject {
     func scheduleReminder(note: String, at fireDate: Date) {
         let item = ReminderItem(note: note, fireDate: fireDate)
 
-        let interval = fireDate.timeIntervalSinceNow
-        guard interval > 0 else { return }
-
         scheduleDispatch(for: item)
 
         allReminders.append(item)
@@ -187,7 +184,10 @@ class ReminderManager: ObservableObject {
 
     private func scheduleDispatch(for item: ReminderItem) {
         let interval = item.fireDate.timeIntervalSinceNow
-        guard interval > 0 else { return }
+        if interval <= 0 {
+            fireReminder(item)
+            return
+        }
 
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now() + interval)
