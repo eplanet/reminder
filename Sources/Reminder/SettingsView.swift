@@ -46,6 +46,16 @@ struct SettingsView: View {
             Text("When enabled, deleted reminders are kept in the JSON file but hidden from the app.")
                 .font(.caption)
                 .foregroundColor(.secondary)
+
+            Divider()
+
+            // Auto-mark expired as fired
+            Toggle("Auto-mark expired reminders as fired", isOn: $manager.autoMarkExpiredAsFired)
+                .font(.subheadline)
+
+            Text("When enabled, overdue reminders are silently marked as fired without notification on app restart or wake.")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
         .padding()
         .frame(width: 300)

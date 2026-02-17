@@ -30,7 +30,7 @@ make clean   # Remove build artifacts
 - **ReminderApp.swift** — `@main` entry point using `MenuBarExtra` with `.window` style
 - **AppDelegate.swift** — Minimal app delegate, `applicationDidFinishLaunching` only
 - **PopoverView.swift** — SwiftUI popover: multi-line input (Enter to submit), upcoming/past reminders list with edit/copy/delete, clickable URLs via `LinkedText`, settings gear button, quit button
-- **SettingsView.swift** — Settings popover: sound picker (system sounds, custom MP3, silent), archive preference toggle
+- **SettingsView.swift** — Settings popover: sound picker (system sounds, custom MP3, silent), archive preference toggle, auto-mark expired toggle
 - **DateParser.swift** — Parses free-form time strings: relative (`in 2h`, `in 30m`) via regex, absolute (`tomorrow at 9am`) via `NSDataDetector`
 - **ReminderManager.swift** — Core logic: schedules `DispatchSourceTimer` per reminder, plays selected sound (NSSound/AVAudioPlayer/silent), triggers osascript notification, persists to disk, supports edit/archive/delete
 - **ReminderModel.swift** — `Codable` struct: `id: UUID`, `note: String`, `fireDate: Date`, `fired: Bool`, `archived: Bool`
@@ -49,6 +49,7 @@ make clean   # Remove build artifacts
 - Fields: `id`, `note`, `fireDate`, `fired`, `archived` (backward-compatible: missing `archived` defaults to `false`)
 - Sound preference stored in UserDefaults under key `reminder_sound`
 - Archive preference stored in UserDefaults under key `reminder_archive_on_delete`
+- Auto-mark expired preference stored in UserDefaults under key `reminder_auto_mark_expired`
 
 ## License
 

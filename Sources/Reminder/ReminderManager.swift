@@ -38,9 +38,16 @@ class ReminderManager: ObservableObject {
         }
     }
 
+    @Published var autoMarkExpiredAsFired: Bool {
+        didSet {
+            UserDefaults.standard.set(autoMarkExpiredAsFired, forKey: autoMarkExpiredKey)
+        }
+    }
+
     private let soundKey = "reminder_sound"
     private let customSoundKey = "reminder_custom_sound_path"
     private let archiveKey = "reminder_archive_on_delete"
+    private let autoMarkExpiredKey = "reminder_auto_mark_expired"
     private var dispatchers: [UUID: DispatchSourceTimer] = [:]
     private var audioPlayer: AVAudioPlayer?
 
@@ -76,10 +83,10 @@ class ReminderManager: ObservableObject {
         self.selectedSoundName = saved
         self.customSoundPath = UserDefaults.standard.string(forKey: customSoundKey)
         self.archiveOnDelete = UserDefaults.standard.object(forKey: archiveKey) as? Bool ?? true
+        self.autoMarkExpiredAsFired = UserDefaults.standard.object(forKey: autoMarkExpiredKey) as? Bool ?? false
         loadReminders()
-        markExpiredAsFired()
         refreshLists()
-        rescheduleAll()
+        rescheduleAll()  // fires overdue reminders (with notification unless autoMarkExpiredAsFired)
     }
 
     func selectSystemSound(_ name: String) {
@@ -185,7 +192,16 @@ class ReminderManager: ObservableObject {
     private func scheduleDispatch(for item: ReminderItem) {
         let interval = item.fireDate.timeIntervalSinceNow
         if interval <= 0 {
-            fireReminder(item)
+            if autoMarkExpiredAsFired {
+                // Silently mark as fired without notification
+                if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
+                    allReminders[index].fired = true
+                }
+                save()
+                refreshLists()
+            } else {
+                fireReminder(item)
+            }
             return
         }
 
@@ -218,16 +234,6 @@ class ReminderManager: ObservableObject {
         for item in allReminders where !item.fired {
             scheduleDispatch(for: item)
         }
-    }
-
-    private func markExpiredAsFired() {
-        let now = Date()
-        var changed = false
-        for i in allReminders.indices where !allReminders[i].fired && allReminders[i].fireDate < now {
-            allReminders[i].fired = true
-            changed = true
-        }
-        if changed { save() }
     }
 
     private func refreshLists() {
