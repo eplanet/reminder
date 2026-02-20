@@ -86,7 +86,42 @@ class ReminderManager: ObservableObject {
         self.autoMarkExpiredAsFired = UserDefaults.standard.object(forKey: autoMarkExpiredKey) as? Bool ?? false
         loadReminders()
         refreshLists()
-        rescheduleAll()  // fires overdue reminders (with notification unless autoMarkExpiredAsFired)
+        rescheduleAll()
+
+        // Check for overdue reminders on system wake and screen unlock
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.checkOverdueReminders() }
+        }
+        DistributedNotificationCenter.default().addObserver(
+            forName: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.checkOverdueReminders() }
+        }
+    }
+
+    /// Check for and fire any overdue reminders (called on wake/unlock).
+    private func checkOverdueReminders() {
+        let now = Date()
+        let overdue = allReminders.filter { !$0.fired && !$0.archived && $0.fireDate <= now }
+        for item in overdue {
+            dispatchers[item.id]?.cancel()
+            dispatchers.removeValue(forKey: item.id)
+            if autoMarkExpiredAsFired {
+                if let index = allReminders.firstIndex(where: { $0.id == item.id }) {
+                    allReminders[index].fired = true
+                }
+            } else {
+                fireReminder(item)
+            }
+        }
+        if !overdue.isEmpty && autoMarkExpiredAsFired {
+            save()
+            refreshLists()
+        }
     }
 
     func selectSystemSound(_ name: String) {
